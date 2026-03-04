@@ -25,31 +25,40 @@ import requests
 
 # ==================== 配置管理 ====================
 
-def get_secrets(key: str, default=None):
-    """获取配置（兼容本地和云端）"""
-    # 1. 尝试从 Streamlit secrets 获取（云端）
-    try:
-        return st.secrets[key]
-    except:
-        pass
-    
-    # 2. 尝试从环境变量获取
-    value = os.getenv(key)
-    if value:
-        return value
-    
-    return default
+# ==================== 配置管理 ====================
 
+# 加载配置（兼容本地和云端）
+# 云端：从 st.secrets 读取
+# 本地：从环境变量读取
 
-# 加载配置
-SUPABASE_URL = get_secrets("SUPABASE_URL")
-SUPABASE_KEY = get_secrets("SUPABASE_KEY")
+try:
+    # 尝试从 Streamlit secrets 获取（云端部署）
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+except:
+    # 本地开发：从环境变量获取
+    SUPABASE_URL = os.getenv("SUPABASE_URL")
+    SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 # 验证配置
 if not SUPABASE_URL or not SUPABASE_KEY:
     st.error("❌ 缺少 Supabase 配置")
-    st.info("请在 Streamlit Cloud 的 Secrets 中配置 SUPABASE_URL 和 SUPABASE_KEY")
+    st.info("""
+    **请在以下位置配置：**
+    
+    **Streamlit Cloud 部署：**
+    - 管理页面 → Settings → Secrets
+    - 添加 SUPABASE_URL 和 SUPABASE_KEY
+    
+    **本地开发：**
+    - 在项目根目录创建 .env 文件
+    - 添加 SUPABASE_URL=xxx 和 SUPABASE_KEY=xxx
+    """)
     st.stop()
+
+# 显示配置状态（调试用，可删除）
+# st.sidebar.write("✅ Supabase 已配置")
+# st.sidebar.write(f"URL: {SUPABASE_URL[:30]}...")
 
 # ==================== 页面配置 ====================
 
