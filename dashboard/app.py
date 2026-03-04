@@ -28,17 +28,26 @@ st.caption(f"更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 def load_data():
     headers = {
         "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}"
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
     }
     
+    # 简化查询，不使用排序（避免字段不存在问题）
     resp = requests.get(
         f"{SUPABASE_URL}/rest/v1/xhs_notes",
         headers=headers,
-        params={"select": "*", "order": "last_modify_ts.desc", "limit": 100},
-        timeout=10
+        params={"select": "*", "limit": 100},
+        timeout=15
     )
     
-    return pd.DataFrame(resp.json()) if resp.status_code == 200 else pd.DataFrame()
+    if resp.status_code == 200:
+        data = resp.json()
+        if data:
+            return pd.DataFrame(data)
+    
+    # 调试信息
+    st.error(f"查询失败: {resp.status_code} - {resp.text[:200]}")
+    return pd.DataFrame()
 
 df = load_data()
 
