@@ -17,9 +17,11 @@
 # 详细许可条款请参阅项目根目录下的LICENSE文件。
 # 使用本代码即表示您同意遵守上述原则和LICENSE中的所有条款。
 
+import os
+
 # Basic configuration
 PLATFORM = "xhs"  # Platform, xhs | dy | ks | bili | wb | tieba | zhihu
-KEYWORDS = "编程副业,编程兼职"  # Keyword search configuration, separated by English commas
+KEYWORDS = "南航飞机餐"  # Keyword search configuration, separated by English commas
 LOGIN_TYPE = "qrcode"  # qrcode or phone or cookie
 COOKIES = ""
 CRAWLER_TYPE = (
@@ -92,7 +94,7 @@ MAX_CONCURRENCY_NUM = 1
 ENABLE_GET_MEIDAS = False
 
 # Whether to enable comment crawling mode. Comment crawling is enabled by default.
-ENABLE_GET_COMMENTS = True
+ENABLE_GET_COMMENTS = False
 
 # Control the number of crawled first-level comments (single video/post)
 CRAWLER_MAX_COMMENTS_COUNT_SINGLENOTES = 10
@@ -119,6 +121,20 @@ FONT_PATH = "./docs/STZHONGS.TTF"
 
 # Crawl interval
 CRAWLER_MAX_SLEEP_SEC = 2
+
+# ==================== Sentiment Analysis Configuration ====================
+# Whether to enable sentiment analysis (Baidu NLP)
+ENABLE_SENTIMENT_ANALYSIS = os.getenv("ENABLE_SENTIMENT_ANALYSIS", "false").lower() == "true"
+
+# Whether to save sentiment analysis results to Supabase
+SAVE_TO_SUPABASE = os.getenv("SAVE_TO_SUPABASE", "false").lower() == "true"
+
+# ==================== Scheduler Configuration ====================
+# Whether to enable scheduler mode (循环定时执行)
+ENABLE_SCHEDULER = os.getenv("ENABLE_SCHEDULER", "false").lower() == "true"
+
+# Scheduler interval in minutes (定时任务间隔，分钟)
+SCHEDULER_INTERVAL_MINUTES = int(os.getenv("SCHEDULER_INTERVAL_MINUTES", "30"))
 
 from .bilibili_config import *
 from .xhs_config import *

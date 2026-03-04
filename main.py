@@ -30,7 +30,12 @@ if sys.stderr and hasattr(sys.stderr, 'buffer'):
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 import asyncio
+from pathlib import Path
 from typing import Optional, Type
+
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent / ".env")
 
 import cmd_arg
 import config
@@ -97,6 +102,78 @@ async def _generate_wordcloud_if_needed() -> None:
         print(f"[Main] Error generating wordcloud: {e}")
 
 
+async def _run_sentiment_analysis_if_needed() -> None:
+    """Run sentiment analysis and save to Supabase if enabled"""
+    if not config.ENABLE_SENTIMENT_ANALYSIS:
+        return
+    
+    if config.SAVE_DATA_OPTION != "json":
+        print("[Main] Sentiment analysis only supports JSON mode currently")
+        return
+    
+    try:
+        from libs.sentiment_processor import SentimentProcessor, find_latest_json
+        
+        # 查找最新JSON文件
+        data_dir = Path(__file__).parent / "data" / config.PLATFORM / "json"
+        data_file = find_latest_json(data_dir)
+        
+        if not data_file:
+            print("[Main] No JSON data file found for sentiment analysis")
+            return
+        
+        print(f"\n[Main] Starting sentiment analysis: {data_file.name}")
+        
+        # 执行情感分析
+        processor = SentimentProcessor()
+        result = processor.run(data_file)
+        
+        # 结果显示在 processor.run() 内部已打印，这里只打印简洁总结
+        print(f"[Main] ✓ 情感分析完成: {result['saved']}/{result['total']} 条已存入 Supabase")
+            
+    except Exception as e:
+        print(f"[Main] Error running sentiment analysis: {e}")
+
+
+async def run_crawler_once():
+    """执行一次完整的爬取流程"""
+    global crawler
+    
+    crawler = CrawlerFactory.create_crawler(platform=config.PLATFORM)
+    await crawler.start()
+
+    _flush_excel_if_needed()
+    await _generate_wordcloud_if_needed()
+    await _run_sentiment_analysis_if_needed()
+
+
+async def run_scheduler(interval_minutes: int):
+    """定时任务模式：循环执行爬取"""
+    import time
+    from datetime import datetime
+    
+    print(f"\n{'='*60}")
+    print("🚀 定时任务模式启动")
+    print(f"   平台: {config.PLATFORM}")
+    print(f"   关键词: {config.KEYWORDS}")
+    print(f"   间隔: {interval_minutes} 分钟")
+    print(f"{'='*60}\n")
+    
+    # 首次立即执行
+    print(f"🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} 首次执行")
+    await run_crawler_once()
+    print(f"✅ 首次执行完成\n")
+    
+    # 循环定时执行
+    while True:
+        print(f"⏳ 等待 {interval_minutes} 分钟后下次执行...")
+        time.sleep(interval_minutes * 60)
+        
+        print(f"\n🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} 定时执行")
+        await run_crawler_once()
+        print(f"✅ 执行完成\n")
+
+
 async def main() -> None:
     global crawler
 
@@ -105,15 +182,17 @@ async def main() -> None:
         await db.init_db(args.init_db)
         print(f"Database {args.init_db} initialized successfully.")
         return
+    
+    # 定时任务模式
+    if config.ENABLE_SCHEDULER:
+        try:
+            await run_scheduler(config.SCHEDULER_INTERVAL_MINUTES)
+        except KeyboardInterrupt:
+            print("\n\n👋 定时任务已停止")
+        return
 
-    crawler = CrawlerFactory.create_crawler(platform=config.PLATFORM)
-    await crawler.start()
-
-    _flush_excel_if_needed()
-
-    # Generate wordcloud after crawling is complete
-    # Only for JSON save mode
-    await _generate_wordcloud_if_needed()
+    # 单次执行模式
+    await run_crawler_once()
 
 
 async def async_cleanup() -> None:
