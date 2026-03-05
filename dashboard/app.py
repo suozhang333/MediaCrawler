@@ -114,31 +114,35 @@ if ip_filter and 'ip_location' in df.columns:
 
 st.title("📈 舆情概览")
 
-# 响应式指标卡
-metric_col1, metric_col2, metric_col3, metric_col4, metric_col5 = st.columns([1, 1, 1, 1, 1])
+# 响应式指标卡 - 手机端优化：2行布局
+# 第一行：总笔记数、负面舆情、正面评价
+col_m1, col_m2, col_m3 = st.columns(3)
 
-with metric_col1:
+with col_m1:
     st.metric("总笔记数", len(df))
 
-with metric_col2:
+with col_m2:
     if 'sentiment' in df.columns:
         neg = len(df[df['sentiment'] == 'negative'])
         st.metric("负面舆情", neg, delta=f"{neg/len(df)*100:.1f}%" if len(df) > 0 else "0%", delta_color="inverse")
 
-with metric_col3:
+with col_m3:
     if 'sentiment' in df.columns:
         pos = len(df[df['sentiment'] == 'positive'])
         st.metric("正面评价", pos)
 
-with metric_col4:
+# 第二行：总点赞、关键词数
+col_m4, col_m5 = st.columns(2)
+
+with col_m4:
     if 'liked_count' in df.columns:
         total_likes = int(df['liked_count'].sum())
         st.metric("总点赞", f"{total_likes:,}")
 
-with metric_col5:
+with col_m5:
     if 'source_keyword' in df.columns:
         keywords = df['source_keyword'].nunique()
-        st.metric("关键词", keywords)
+        st.metric("关键词数", keywords)
 
 st.markdown("---")
 
