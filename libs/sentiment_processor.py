@@ -22,51 +22,6 @@ from libs.baidu_nlp import BaiduNLP
 from libs.supabase_client import SupabaseClient
 from libs.wechat_work_webhook import NegativeAlertPusher
 import os
-import requests
-
-
-class SentimentAnalyzer:
-    """情感分析器 - 支持本地百度API和Supabase Edge Function"""
-    
-    def __init__(self):
-        self.use_edge_function = os.getenv("USE_SUPABASE_SENTIMENT", "false").lower() == "true"
-        self.supabase_url = os.getenv("SUPABASE_URL")
-        self.supabase_key = os.getenv("SUPABASE_KEY")
-        
-        if not self.use_edge_function:
-            self.nlp = BaiduNLP()
-    
-    def analyze(self, text: str) -> Dict:
-        """
-        分析文本情感
-        
-        Returns:
-            {
-                "sentiment": "positive/neutral/negative",
-                "confidence": float,
-                "positive_prob": float,
-                "negative_prob": float
-            }
-        """
-        if not self.use_edge_function:
-            # 本地调用百度API
-            return self.nlp.analyze(text)
-        
-        # 调用 Supabase Edge Function
-        response = requests.post(
-            f"{self.supabase_url}/functions/v1/sentiment",
-            headers={
-                "Authorization": f"Bearer {self.supabase_key}",
-                "Content-Type": "application/json",
-            },
-            json={"text": text[:2048]},
-            timeout=30,
-        )
-        
-        if response.status_code != 200:
-            raise Exception(f"Edge Function error: {response.text}")
-        
-        return response.json()
 
 
 class SentimentProcessor:
@@ -87,7 +42,7 @@ class SentimentProcessor:
             qps: 每秒请求数，控制百度API调用频率
             enable_alert: 是否启用负面舆情实时推送
         """
-        self.analyzer = SentimentAnalyzer()
+        self.nlp = BaiduNLP()
         self.supabase = SupabaseClient()
         self.delay = 1.0 / qps  # 请求间隔
         self.processed = 0
@@ -182,7 +137,7 @@ class SentimentProcessor:
             if text:
                 try:
                     # 百度API限制2048字节
-                    result = self.analyzer.analyze(text[:2048])
+                    result = self.nlp.analyze(text[:2048])
                     note["sentiment"] = result["sentiment"]
                     self.processed += 1
                     
@@ -271,6 +226,12 @@ def find_latest_json(data_dir: Path) -> Optional[Path]:
     if not json_files:
         return None
     return max(json_files, key=lambda p: p.stat().st_mtime)
+
+
+def load_json_data(file_path: str) -> List[Dict]:
+    """加载JSON数据"""
+    with open(file_path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 def main():
