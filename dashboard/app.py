@@ -230,11 +230,23 @@ if 'sentiment' in df.columns:
         st.error(f"⚠️ 发现 {len(negative_df)} 条负面舆情")
         
         for idx, row in negative_df.head(5).iterrows():
-            with st.expander(f"📌 {row.get('title', '无标题')[:50]}... | 👍 {row.get('liked_count', 0)}"):
+            title = row.get('title', '无标题')
+            url = row.get('note_url', '')
+            likes = row.get('liked_count', 0)
+            
+            # 标题作为展开器的标签（简洁显示）
+            expander_label = f"📌 {title[:50]}... | 👍 {likes}"
+            
+            with st.expander(expander_label):
                 col1, col2 = st.columns([3, 1])
                 
                 with col1:
-                    st.markdown(f"**标题:** {row.get('title', '无')}")
+                    # 标题作为超链接
+                    if url:
+                        st.markdown(f"### [{title}]({url})")
+                    else:
+                        st.markdown(f"### {title}")
+                    
                     st.markdown(f"**内容:** {str(row.get('desc', ''))[:200]}...")
                     st.markdown(f"**作者:** {row.get('nickname', '未知')} | **地区:** {row.get('ip_location', '未知')}")
                     st.markdown(f"**关键词:** {row.get('source_keyword', '无')}")
@@ -260,13 +272,15 @@ available_cols = [c for c in display_cols if c in df.columns]
 
 display_df = df[available_cols].copy()
 
-# 截断长文本
-if 'title' in display_df.columns:
-    display_df['title'] = display_df['title'].astype(str).str[:60] + '...'
-
-# 添加链接
-if 'note_url' in display_df.columns:
-    display_df['note_url'] = display_df['note_url'].apply(lambda x: f"[链接]({x})" if x else "")
+# 标题添加超链接
+if 'title' in display_df.columns and 'note_url' in display_df.columns:
+    display_df['title'] = display_df.apply(
+        lambda row: f"[{str(row['title'])[:50]}...]({row['note_url']})" if row['note_url'] else str(row['title'])[:50] + '...',
+        axis=1
+    )
+    # 删除单独的 note_url 列（已合并到标题）
+    if 'note_url' in display_df.columns:
+        display_df = display_df.drop('note_url', axis=1)
 
 st.dataframe(display_df, use_container_width=True, hide_index=True)
 
