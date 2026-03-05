@@ -141,10 +141,7 @@ async def _run_sentiment_analysis_if_needed() -> None:
         print(f"\n[Main] Starting sentiment analysis: {data_file.name}")
         
         # 执行情感分析
-        use_local = os.getenv("USE_LOCAL_SENTIMENT", "false").lower() == "true"
-        logger.info(f"[Sentiment] use_local={use_local}")
-        print(f"[Sentiment] use_local={use_local}")
-        processor = SentimentProcessor(use_local=use_local)
+        processor = SentimentProcessor()
         result = processor.run(data_file)
         
         # 结果显示在 processor.run() 内部已打印，这里只打印简洁总结
