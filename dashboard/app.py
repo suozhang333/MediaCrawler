@@ -221,7 +221,19 @@ if 'sentiment' in df.columns:
             url = row.get('note_url', '')
             likes = row.get('liked_count', 0)
             
-            with st.expander(f"📌 {title[:50]}... | 👍 {likes}"):
+            # 获取发布时间
+            pub_time_str = ""
+            if row.get('publish_time'):
+                pub_time = row['publish_time']
+                if isinstance(pub_time, str):
+                    pub_time_str = pub_time[:10]
+                else:
+                    pub_time_str = str(pub_time)[:10]
+            
+            # 标题显示日期和点赞
+            expander_title = f"📌 {title[:40]}... | 📅 {pub_time_str} | 👍 {likes}"
+            
+            with st.expander(expander_title):
                 if url:
                     st.markdown(f"### [{title}]({url})")
                 else:
@@ -253,20 +265,31 @@ st.markdown("---")
 
 st.header("📋 详细数据")
 
-display_cols = ['title', 'sentiment', 'liked_count', 'comment_count', 'ip_location', 'source_keyword']
+# 选择显示列（添加发布日期）
+display_cols = ['title', 'sentiment', 'liked_count', 'comment_count', 'ip_location', 'source_keyword', 'publish_time']
 available_cols = [c for c in display_cols if c in df.columns]
 
 display_df = df[available_cols].copy()
 
+# 标题添加超链接
 if 'title' in display_df.columns and 'note_url' in df.columns:
     display_df['title'] = df.apply(
-        lambda row: f"[{str(row['title'])[:50]}...]({row['note_url']})" if row['note_url'] else str(row['title'])[:50] + '...',
+        lambda row: f"[{str(row['title'])[:40]}...]({row['note_url']})" if row['note_url'] else str(row['title'])[:40] + '...',
         axis=1
     )
 
+# 情感翻译
 if 'sentiment' in display_df.columns:
     sentiment_map = {'positive': '正面', 'neutral': '中性', 'negative': '负面'}
     display_df['sentiment'] = display_df['sentiment'].map(sentiment_map)
+
+# 发布日期格式化
+if 'publish_time' in display_df.columns:
+    display_df['publish_time'] = display_df['publish_time'].apply(
+        lambda x: str(x)[:10] if pd.notna(x) else ''
+    )
+    # 重命名列
+    display_df = display_df.rename(columns={'publish_time': '发布日期'})
 
 st.dataframe(display_df, use_container_width=True, hide_index=True)
 
@@ -287,10 +310,26 @@ with col_export2:
     try:
         import io
         
-        # 复制数据并转换类型，避免 datetime 等问题
-        df_export = df.copy()
+        # 选择关键字段导出，避免字段太多
+        export_cols = ['title', 'desc', 'sentiment', 'liked_count', 'comment_count', 
+                       'ip_location', 'source_keyword', 'publish_time', 'note_url']
+        df_export = df[[c for c in export_cols if c in df.columns]].copy()
         
-        # 转换所有列为字符串，避免 Excel 写入问题
+        # 重命名列为中文
+        col_names = {
+            'title': '标题',
+            'desc': '内容',
+            'sentiment': '情感',
+            'liked_count': '点赞数',
+            'comment_count': '评论数',
+            'ip_location': '地区',
+            'source_keyword': '关键词',
+            'publish_time': '发布日期',
+            'note_url': '链接'
+        }
+        df_export = df_export.rename(columns=col_names)
+        
+        # 转换所有列为字符串
         for col in df_export.columns:
             df_export[col] = df_export[col].astype(str)
         
