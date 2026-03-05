@@ -30,12 +30,28 @@ if sys.stderr and hasattr(sys.stderr, 'buffer'):
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 import asyncio
+import logging
+import os
+from datetime import datetime
 from pathlib import Path
 from typing import Optional, Type
 
 # Load environment variables
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
+
+# Setup logging
+os.makedirs("logs", exist_ok=True)
+log_file = f"logs/crawler_{datetime.now().strftime('%Y%m%d')}.log"
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.FileHandler(log_file, encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 import cmd_arg
 import config
@@ -150,8 +166,15 @@ async def run_crawler_once():
 async def run_scheduler(interval_minutes: int):
     """定时任务模式：循环执行爬取"""
     import time
-    from datetime import datetime
     
+    logger.info(f"{'='*60}")
+    logger.info("🚀 定时任务模式启动")
+    logger.info(f"   平台: {config.PLATFORM}")
+    logger.info(f"   关键词: {config.KEYWORDS}")
+    logger.info(f"   间隔: {interval_minutes} 分钟")
+    logger.info(f"{'='*60}")
+    
+    # 同时输出到控制台
     print(f"\n{'='*60}")
     print("🚀 定时任务模式启动")
     print(f"   平台: {config.PLATFORM}")
@@ -160,17 +183,22 @@ async def run_scheduler(interval_minutes: int):
     print(f"{'='*60}\n")
     
     # 首次立即执行
+    logger.info("首次执行")
     print(f"🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} 首次执行")
     await run_crawler_once()
+    logger.info("首次执行完成")
     print(f"✅ 首次执行完成\n")
     
     # 循环定时执行
     while True:
+        logger.info(f"等待 {interval_minutes} 分钟后下次执行...")
         print(f"⏳ 等待 {interval_minutes} 分钟后下次执行...")
         time.sleep(interval_minutes * 60)
         
+        logger.info("定时执行")
         print(f"\n🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} 定时执行")
         await run_crawler_once()
+        logger.info("执行完成")
         print(f"✅ 执行完成\n")
 
 

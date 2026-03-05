@@ -4,9 +4,11 @@
 流程: 加载JSON → 情感分析 → 存入Supabase
 """
 import json
+import logging
 import re
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -23,6 +25,19 @@ from libs.local_sentiment import LocalSentimentAnalyzer
 from libs.supabase_client import SupabaseClient
 from libs.wechat_work_webhook import NegativeAlertPusher
 import os
+
+# Setup logging
+os.makedirs("logs", exist_ok=True)
+log_file = f"logs/sentiment_{datetime.now().strftime('%Y%m%d')}.log"
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.FileHandler(log_file, encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 
 class SentimentProcessor:
@@ -49,10 +64,12 @@ class SentimentProcessor:
             use_local = os.getenv("USE_LOCAL_SENTIMENT", "false").lower() == "true"
         
         if use_local:
+            logger.info("[SentimentProcessor] 使用本地 SnowNLP 情感分析")
             print("[SentimentProcessor] 使用本地 SnowNLP 情感分析")
             self.nlp = LocalSentimentAnalyzer()
             self.delay = 0.1  # 本地分析快，间隔短
         else:
+            logger.info("[SentimentProcessor] 使用百度 NLP 情感分析")
             print("[SentimentProcessor] 使用百度 NLP 情感分析")
             self.nlp = BaiduNLP()
             self.delay = 1.0 / qps  # 百度API需要控制QPS
@@ -81,20 +98,26 @@ class SentimentProcessor:
                 "saved": 成功存储条数
             }
         """
+        logger.info("=" * 60)
+        logger.info("情感分析处理器启动")
+        logger.info("=" * 60)
         print("=" * 60)
         print("情感分析处理器启动")
         print("=" * 60)
         
         # 1. 加载数据
         notes = self._load(json_file)
+        logger.info(f"[Processor] 加载数据: {json_file.name}, 共 {len(notes)} 条")
         print(f"[Processor] 加载数据: {json_file.name}, 共 {len(notes)} 条")
         
         # 2. 情感分析
         analyzed = self._analyze_batch(notes)
+        logger.info(f"[Processor] 分析完成: 成功 {self.processed}, 失败 {self.failed}")
         print(f"[Processor] 分析完成: 成功 {self.processed}, 失败 {self.failed}")
         
         # 3. 推送负面舆情告警（优先推送，及时通知）
         if self.alert_pusher and self.negative_count > 0:
+            logger.warning(f"[Processor] 发现 {self.negative_count} 条负面舆情，准备推送...")
             print(f"[Processor] 发现 {self.negative_count} 条负面舆情，准备推送...")
             self.alert_pusher.push_if_needed(force=True)
         
@@ -102,6 +125,13 @@ class SentimentProcessor:
         result = self._save(analyzed, json_file)
         
         # 打印详细统计
+        stats_msg = f"""📊 情感分析统计
+  加载数据:     {len(notes):>3} 条
+  分析成功:     {self.processed:>3} 条
+  负面舆情:     {self.negative_count:>3} 条 {'🚨' if self.negative_count > 0 else ''}
+  分析失败:     {self.failed:>3} 条
+  存入Supabase: {result['success']:>3} 条"""
+        logger.info(stats_msg)
         print("\n" + "=" * 60)
         print("📊 情感分析统计")
         print("=" * 60)
@@ -111,6 +141,7 @@ class SentimentProcessor:
         print(f"  分析失败:     {self.failed:>3} 条")
         print(f"  存入Supabase: {result['success']:>3} 条")
         if result['failed'] > 0:
+            logger.warning(f"  存储失败:     {result['failed']:>3} 条")
             print(f"  存储失败:     {result['failed']:>3} 条")
         print("=" * 60)
         
@@ -159,10 +190,14 @@ class SentimentProcessor:
                         self.negative_count += 1
                         if self.alert_pusher:
                             self.alert_pusher.add_negative(note)
-                            print(f"  [ALERT] 发现负面舆情: {note.get('title', '')[:30]}...")
+                            alert_msg = f"  [ALERT] 发现负面舆情: {note.get('title', '')[:30]}..."
+                            logger.warning(alert_msg)
+                            print(alert_msg)
                 
                 except Exception as e:
-                    print(f"  [WARN] 分析失败 {note.get('note_id')}: {e}")
+                    err_msg = f"  [WARN] 分析失败 {note.get('note_id')}: {e}"
+                    logger.warning(err_msg)
+                    print(err_msg)
                     note["sentiment"] = None
                     self.failed += 1
             else:
@@ -173,7 +208,9 @@ class SentimentProcessor:
             # 打印进度
             if i % 5 == 0 or i == total:
                 sentiment = note.get("sentiment")
-                print(f"  [{i}/{total}] {sentiment or 'NULL'}")
+                progress_msg = f"  [{i}/{total}] {sentiment or 'NULL'}"
+                logger.info(progress_msg)
+                print(progress_msg)
             
             # QPS控制
             if i < total:
@@ -218,9 +255,12 @@ class SentimentProcessor:
         if json_file and json_file.exists():
             try:
                 json_file.unlink()
+                logger.info(f"[Processor] 已删除源文件: {json_file.name}")
                 print(f"[Processor] 已删除源文件: {json_file.name}")
             except Exception as e:
-                print(f"[WARN] 删除文件失败: {e}")
+                err_msg = f"[WARN] 删除文件失败: {e}"
+                logger.warning(err_msg)
+                print(err_msg)
         
         return result
 
@@ -264,14 +304,17 @@ def main():
         data_dir = Path(__file__).parent.parent / "data" / "xhs" / "json"
         data_file = find_latest_json(data_dir)
         if not data_file:
+            logger.error(f"[ERROR] 在 {data_dir} 未找到JSON文件")
             print(f"[ERROR] 在 {data_dir} 未找到JSON文件")
             sys.exit(1)
+        logger.info(f"[INFO] 自动找到最新文件: {data_file.name}")
         print(f"[INFO] 自动找到最新文件: {data_file.name}")
     else:
         # 默认文件
         data_file = Path(__file__).parent.parent / "data" / "xhs" / "json" / "search_contents_2026-03-04.json"
     
     if not data_file.exists():
+        logger.error(f"[ERROR] 数据文件不存在: {data_file}")
         print(f"[ERROR] 数据文件不存在: {data_file}")
         print("请先执行爬虫获取数据: python main.py --platform xhs")
         sys.exit(1)
