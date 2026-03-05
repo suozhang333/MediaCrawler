@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 舆情监控仪表盘 - Streamlit Cloud + Supabase
-优化版：基于实际字段设计
 """
 import streamlit as st
 import pandas as pd
@@ -41,7 +40,6 @@ def load_data():
     
     if resp.status_code == 200:
         df = pd.DataFrame(resp.json())
-        # 数据类型转换
         if 'publish_time' in df.columns:
             df['publish_time'] = pd.to_datetime(df['publish_time'])
         if 'created_at' in df.columns:
@@ -53,88 +51,51 @@ def load_data():
         return df
     return pd.DataFrame()
 
-# 加载数据
-df_original = load_data()
-
-if df_original.empty:
-    st.error("❌ 暂无数据，请先运行爬虫")
-    st.stop()
-
-# ==================== 侧边栏筛选 ====================
+# ==================== 侧边栏 ====================
 
 with st.sidebar:
     st.title("📊 舆情监控")
     
-    # 刷新按钮
     if st.button("🔄 刷新数据"):
         st.cache_data.clear()
         st.rerun()
     
     st.markdown("---")
     
-    # 基础筛选
     st.header("🔍 筛选")
     
-    # 时间范围
     time_range = st.selectbox(
         "时间范围",
         ["全部", "最近7天", "最近30天", "最近90天"]
     )
     
-    # 情感筛选（中文）
     sentiment_options = {"正面": "positive", "中性": "neutral", "负面": "negative"}
     selected_sentiments = st.multiselect(
         "情感倾向",
         options=list(sentiment_options.keys()),
         default=list(sentiment_options.keys())
     )
-    sentiment_filter = [sentiment_options[k] for k in selected_sentiments]
     
-    # 关键词搜索
     keyword_search = st.text_input("关键词搜索", "")
-    
-    st.markdown("---")
-    
-    # 地区筛选
-    st.header("📍 地区")
-    
-    # 中国省份列表
-    china_provinces = [
-        '北京', '天津', '上海', '重庆', '河北', '山西', '辽宁', '吉林', '黑龙江',
-        '江苏', '浙江', '安徽', '福建', '江西', '山东', '河南', '湖北', '湖南',
-        '广东', '海南', '四川', '贵州', '云南', '陕西', '甘肃', '青海', '台湾',
-        '内蒙古', '广西', '西藏', '宁夏', '新疆', '香港', '澳门'
-    ]
-    
-    # 只显示数据中存在的省份
-    if 'ip_location' in df_original.columns:
-        available_provinces = [p for p in china_provinces if p in df_original['ip_location'].values]
-        if available_provinces:
-            selected_provinces = st.multiselect(
-                "中国省份",
-                options=available_provinces,
-                default=[]
-            )
-        else:
-            selected_provinces = []
-    else:
-        selected_provinces = []
-    
-    # 通用地区搜索
-    ip_filter = st.text_input("地区搜索", "")
+    ip_filter = st.text_input("地区筛选", "")
     
     st.markdown("---")
     st.caption(f"⏰ 更新时间: {datetime.now().strftime('%H:%M:%S')}")
 
-# ==================== 应用筛选 ====================
+# ==================== 加载并筛选数据 ====================
 
-df = df_original.copy()
+df = load_data()
+
+if df.empty:
+    st.error("❌ 暂无数据")
+    st.stop()
 
 if time_range != "全部" and 'publish_time' in df.columns:
     days = {"最近7天": 7, "最近30天": 30, "最近90天": 90}[time_range]
     cutoff = datetime.now() - timedelta(days=days)
     df = df[df['publish_time'] >= cutoff]
 
+sentiment_filter = [sentiment_options[k] for k in selected_sentiments]
 if sentiment_filter and 'sentiment' in df.columns:
     df = df[df['sentiment'].isin(sentiment_filter)]
 
@@ -144,9 +105,6 @@ if keyword_search:
         df['desc'].astype(str).str.contains(keyword_search, case=False, na=False)
     )
     df = df[mask]
-
-if selected_provinces and 'ip_location' in df.columns:
-    df = df[df['ip_location'].isin(selected_provinces)]
 
 if ip_filter and 'ip_location' in df.columns:
     df = df[df['ip_location'].astype(str).str.contains(ip_filter, case=False, na=False)]
@@ -182,21 +140,17 @@ with col5:
 
 st.markdown("---")
 
-# ==================== 可视化区域 ====================
+# ==================== 可视化 ====================
 
 st.header("📊 数据分析")
 
 col_left, col_right = st.columns(2)
 
-# 情感分布饼图
 with col_left:
     if 'sentiment' in df.columns:
         sentiment_counts = df['sentiment'].value_counts()
-        
-        # 英文转中文
         sentiment_name_map = {'positive': '正面', 'neutral': '中性', 'negative': '负面'}
         sentiment_counts.index = sentiment_counts.index.map(sentiment_name_map)
-        
         colors = {'正面': '#52c41a', '中性': '#faad14', '负面': '#f5222d'}
         
         fig = px.pie(
@@ -210,11 +164,9 @@ with col_left:
         fig.update_traces(textinfo='percent+label')
         st.plotly_chart(fig, use_container_width=True)
 
-# 关键词 TOP10
 with col_right:
     if 'source_keyword' in df.columns:
         keyword_counts = df['source_keyword'].value_counts().head(10)
-        
         fig = px.bar(
             x=keyword_counts.values,
             y=keyword_counts.index,
@@ -226,55 +178,21 @@ with col_right:
         )
         st.plotly_chart(fig, use_container_width=True)
 
-# 第二行可视化
+# 第二行
 col_left2, col_right2 = st.columns(2)
 
-# 中国省份分布
 with col_left2:
     if 'ip_location' in df.columns:
-        china_provinces = [
-            '北京', '天津', '上海', '重庆', '河北', '山西', '辽宁', '吉林', '黑龙江',
-            '江苏', '浙江', '安徽', '福建', '江西', '山东', '河南', '湖北', '湖南',
-            '广东', '海南', '四川', '贵州', '云南', '陕西', '甘肃', '青海', '台湾',
-            '内蒙古', '广西', '西藏', '宁夏', '新疆', '香港', '澳门'
-        ]
-        
-        china_df = df[df['ip_location'].isin(china_provinces)]
-        
-        if not china_df.empty:
-            province_counts = china_df['ip_location'].value_counts().head(15)
-            
-            fig = px.bar(
-                x=province_counts.values,
-                y=province_counts.index,
-                orientation='h',
-                title="🇨🇳 中国省份分布 Top 15",
-                labels={'x': '笔记数量', 'y': '省份'},
-                color=province_counts.values,
-                color_continuous_scale='Reds'
-            )
-            fig.update_layout(height=400)
-            st.plotly_chart(fig, use_container_width=True)
-            
-            china_ratio = len(china_df) / len(df) * 100
-            st.caption(f"🇨🇳 中国境内: {len(china_df)} 条 ({china_ratio:.1f}%) | 覆盖 {china_df['ip_location'].nunique()} 个省份")
-        else:
-            st.info("暂无中国省份数据")
-            
-        st.subheader("🌍 全球地区分布 Top 10")
         ip_counts = df['ip_location'].value_counts().head(10)
-        fig2 = px.bar(
+        fig = px.bar(
             x=ip_counts.values,
             y=ip_counts.index,
             orientation='h',
-            labels={'x': '数量', 'y': '地区'},
-            color=ip_counts.values,
-            color_continuous_scale='Blues'
+            title="地区分布 Top 10",
+            labels={'x': '数量', 'y': '地区'}
         )
-        fig2.update_layout(height=250)
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True)
 
-# 点赞数分布
 with col_right2:
     if 'liked_count' in df.columns:
         fig = px.histogram(
@@ -288,7 +206,7 @@ with col_right2:
 
 st.markdown("---")
 
-# ==================== 负面舆情告警 ====================
+# ==================== 负面舆情 ====================
 
 st.header("🚨 负面舆情监控")
 
@@ -303,9 +221,7 @@ if 'sentiment' in df.columns:
             url = row.get('note_url', '')
             likes = row.get('liked_count', 0)
             
-            expander_label = f"📌 {title[:50]}... | 👍 {likes}"
-            
-            with st.expander(expander_label):
+            with st.expander(f"📌 {title[:50]}... | 👍 {likes}"):
                 if url:
                     st.markdown(f"### [{title}]({url})")
                 else:
@@ -323,7 +239,7 @@ if 'sentiment' in df.columns:
                     if row.get('publish_time'):
                         st.caption(f"发布时间: {row['publish_time'][:10]}")
     else:
-        st.success("✅ 暂无负面舆情，一切正常！")
+        st.success("✅ 暂无负面舆情")
 
 st.markdown("---")
 
@@ -336,21 +252,19 @@ available_cols = [c for c in display_cols if c in df.columns]
 
 display_df = df[available_cols].copy()
 
-# 标题添加超链接
 if 'title' in display_df.columns and 'note_url' in df.columns:
     display_df['title'] = df.apply(
         lambda row: f"[{str(row['title'])[:50]}...]({row['note_url']})" if row['note_url'] else str(row['title'])[:50] + '...',
         axis=1
     )
 
-# 情感翻译
 if 'sentiment' in display_df.columns:
     sentiment_map = {'positive': '正面', 'neutral': '中性', 'negative': '负面'}
     display_df['sentiment'] = display_df['sentiment'].map(sentiment_map)
 
 st.dataframe(display_df, use_container_width=True, hide_index=True)
 
-# ==================== 导出功能 ====================
+# ==================== 导出 ====================
 
 col_export1, col_export2 = st.columns(2)
 
@@ -383,7 +297,5 @@ with col_export2:
     except ImportError:
         st.info("安装 openpyxl 后支持 Excel 导出")
 
-# ==================== 页脚 ====================
-
 st.markdown("---")
-st.caption("🚀 Powered by Streamlit Cloud + Supabase | 舆情监控系统")
+st.caption("🚀 Powered by Streamlit Cloud + Supabase")
