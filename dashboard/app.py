@@ -76,12 +76,14 @@ with st.sidebar:
         ["全部", "最近7天", "最近30天", "最近90天"]
     )
     
-    # 情感筛选
-    sentiment_filter = st.multiselect(
+    # 情感筛选（中文显示）
+    sentiment_options = {"正面": "positive", "中性": "neutral", "负面": "negative"}
+    selected_sentiments = st.multiselect(
         "情感倾向",
-        options=["positive", "neutral", "negative"],
-        default=["positive", "neutral", "negative"]
+        options=list(sentiment_options.keys()),
+        default=list(sentiment_options.keys())
     )
+    sentiment_filter = [sentiment_options[k] for k in selected_sentiments]
     
     # 关键词搜索
     keyword_search = st.text_input("关键词搜索", "")
@@ -160,7 +162,12 @@ col_left, col_right = st.columns(2)
 with col_left:
     if 'sentiment' in df.columns:
         sentiment_counts = df['sentiment'].value_counts()
-        colors = {'positive': '#52c41a', 'neutral': '#faad14', 'negative': '#f5222d'}
+        
+        # 英文转中文映射
+        sentiment_name_map = {'positive': '正面', 'neutral': '中性', 'negative': '负面'}
+        sentiment_counts.index = sentiment_counts.index.map(sentiment_name_map)
+        
+        colors = {'正面': '#52c41a', '中性': '#faad14', '负面': '#f5222d'}
         
         fig = px.pie(
             values=sentiment_counts.values,
