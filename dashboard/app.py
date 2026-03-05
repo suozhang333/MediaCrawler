@@ -88,8 +88,31 @@ with st.sidebar:
     # 关键词搜索
     keyword_search = st.text_input("关键词搜索", "")
     
-    # IP 位置筛选
-    ip_filter = st.text_input("地区筛选", "")
+    # 地区筛选
+    st.subheader("📍 地区")
+    
+    # 中国省份快捷筛选
+    china_provinces_list = [
+        '北京', '天津', '上海', '重庆', '河北', '山西', '辽宁', '吉林', '黑龙江',
+        '江苏', '浙江', '安徽', '福建', '江西', '山东', '河南', '湖北', '湖南',
+        '广东', '海南', '四川', '贵州', '云南', '陕西', '甘肃', '青海', '台湾',
+        '内蒙古', '广西', '西藏', '宁夏', '新疆', '香港', '澳门'
+    ]
+    
+    # 只显示数据中存在的省份
+    available_provinces = [p for p in china_provinces_list if p in df['ip_location'].values] if 'ip_location' in df.columns else []
+    
+    if available_provinces:
+        selected_provinces = st.multiselect(
+            "中国省份",
+            options=available_provinces,
+            default=[]
+        )
+    else:
+        selected_provinces = []
+    
+    # 通用地区搜索
+    ip_filter = st.text_input("地区搜索", "")
     
     st.markdown("---")
     st.caption(f"⏰ 更新时间: {datetime.now().strftime('%H:%M:%S')}")
@@ -117,6 +140,9 @@ if keyword_search:
         df['desc'].astype(str).str.contains(keyword_search, case=False, na=False)
     )
     df = df[mask]
+
+if selected_provinces and 'ip_location' in df.columns:
+    df = df[df['ip_location'].isin(selected_provinces)]
 
 if ip_filter and 'ip_location' in df.columns:
     df = df[df['ip_location'].astype(str).str.contains(ip_filter, case=False, na=False)]
@@ -199,18 +225,55 @@ with col_right:
 # 第二行可视化
 col_left2, col_right2 = st.columns(2)
 
-# 地区分布
+# 中国省份分布
 with col_left2:
     if 'ip_location' in df.columns:
+        # 定义中国省份列表
+        china_provinces = [
+            '北京', '天津', '上海', '重庆', '河北', '山西', '辽宁', '吉林', '黑龙江',
+            '江苏', '浙江', '安徽', '福建', '江西', '山东', '河南', '湖北', '湖南',
+            '广东', '海南', '四川', '贵州', '云南', '陕西', '甘肃', '青海', '台湾',
+            '内蒙古', '广西', '西藏', '宁夏', '新疆', '香港', '澳门'
+        ]
+        
+        # 筛选中国省份数据
+        china_df = df[df['ip_location'].isin(china_provinces)]
+        
+        if not china_df.empty:
+            province_counts = china_df['ip_location'].value_counts().head(15)
+            
+            # 使用条形图展示（比地图更可靠）
+            fig = px.bar(
+                x=province_counts.values,
+                y=province_counts.index,
+                orientation='h',
+                title="🇨🇳 中国省份分布 Top 15",
+                labels={'x': '笔记数量', 'y': '省份'},
+                color=province_counts.values,
+                color_continuous_scale='Reds'
+            )
+            fig.update_layout(height=400)
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # 显示统计
+            china_ratio = len(china_df) / len(df) * 100
+            st.caption(f"🇨🇳 中国境内数据: {len(china_df)} 条 ({china_ratio:.1f}%) | 覆盖 {china_df['ip_location'].nunique()} 个省份/地区")
+        else:
+            st.info("暂无中国省份数据")
+            
+        # 显示全球 Top 10 地区
+        st.subheader("🌍 全球地区分布 Top 10")
         ip_counts = df['ip_location'].value_counts().head(10)
-        fig = px.bar(
+        fig2 = px.bar(
             x=ip_counts.values,
             y=ip_counts.index,
             orientation='h',
-            title="地区分布 Top 10",
-            labels={'x': '数量', 'y': '地区'}
+            labels={'x': '数量', 'y': '地区'},
+            color=ip_counts.values,
+            color_continuous_scale='Blues'
         )
-        st.plotly_chart(fig, use_container_width=True)
+        fig2.update_layout(height=250)
+        st.plotly_chart(fig2, use_container_width=True)
 
 # 点赞数分布
 with col_right2:
