@@ -14,8 +14,8 @@ from datetime import datetime, timedelta
 st.set_page_config(
     page_title="舆情监控仪表盘",
     page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide",  # 桌面端宽屏
+    initial_sidebar_state="collapsed"  # 手机端默认收起侧边栏
 )
 
 # 读取 Secrets
@@ -114,30 +114,31 @@ if ip_filter and 'ip_location' in df.columns:
 
 st.title("📈 舆情概览")
 
-col1, col2, col3, col4, col5 = st.columns(5)
+# 响应式指标卡
+metric_col1, metric_col2, metric_col3, metric_col4, metric_col5 = st.columns([1, 1, 1, 1, 1])
 
-with col1:
+with metric_col1:
     st.metric("总笔记数", len(df))
 
-with col2:
+with metric_col2:
     if 'sentiment' in df.columns:
         neg = len(df[df['sentiment'] == 'negative'])
         st.metric("负面舆情", neg, delta=f"{neg/len(df)*100:.1f}%" if len(df) > 0 else "0%", delta_color="inverse")
 
-with col3:
+with metric_col3:
     if 'sentiment' in df.columns:
         pos = len(df[df['sentiment'] == 'positive'])
         st.metric("正面评价", pos)
 
-with col4:
+with metric_col4:
     if 'liked_count' in df.columns:
         total_likes = int(df['liked_count'].sum())
         st.metric("总点赞", f"{total_likes:,}")
 
-with col5:
+with metric_col5:
     if 'source_keyword' in df.columns:
         keywords = df['source_keyword'].nunique()
-        st.metric("监控关键词", keywords)
+        st.metric("关键词", keywords)
 
 st.markdown("---")
 
@@ -190,10 +191,23 @@ if 'publish_time' in df.columns and 'sentiment' in df.columns:
     fig.update_layout(
         barmode='stack',
         title="每日笔记数量（按情感分类）",
-        xaxis_title="日期",
+        xaxis_title="发布日期",
         yaxis_title="笔记数量",
-        height=400,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        height=350,
+        legend=dict(
+            orientation="h", 
+            yanchor="bottom", 
+            y=1.02, 
+            xanchor="center", 
+            x=0.5,
+            title_text=''
+        ),
+        # 手机端优化
+        xaxis=dict(
+            tickangle=-45,
+            tickfont=dict(size=10)
+        ),
+        margin=dict(l=50, r=50, t=80, b=80)
     )
     
     st.plotly_chart(fig, use_container_width=True)
