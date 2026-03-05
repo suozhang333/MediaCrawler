@@ -68,8 +68,14 @@ class SentimentProcessor:
         self.negative_count = 0
         
         # 初始化负面舆情推送器
+        enable_wechat_alert = os.getenv("ENABLE_WECHAT_ALERT", "true").lower() == "true"
         webhook_url = os.getenv("WECHAT_WORK_WEBHOOK")
-        self.alert_pusher = NegativeAlertPusher(webhook_url) if (enable_alert and webhook_url) else None
+        self.alert_pusher = NegativeAlertPusher(webhook_url) if (enable_alert and enable_wechat_alert and webhook_url) else None
+        
+        if self.alert_pusher:
+            logger.info("[SentimentProcessor] 企业微信告警已启用")
+        else:
+            logger.info("[SentimentProcessor] 企业微信告警已禁用")
     
     def run(self, json_file: Path) -> Dict:
         """
