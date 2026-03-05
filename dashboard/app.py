@@ -150,8 +150,8 @@ st.header("📊 数据分析")
 if 'publish_time' in df.columns and 'sentiment' in df.columns:
     st.subheader("📅 每日舆情趋势")
     
-    # 提取日期（去掉时间）
-    df['date'] = df['publish_time'].dt.date
+    # 提取日期（去掉时间），并格式化为中文 MM-DD
+    df['date'] = df['publish_time'].dt.strftime('%m-%d')
     
     # 按日期和情感分组统计
     daily_sentiment = df.groupby(['date', 'sentiment']).size().reset_index(name='count')
@@ -214,6 +214,9 @@ if 'publish_time' in df.columns and 'sentiment' in df.columns:
     
     st.markdown("---")
 
+# 只保留情感分布饼图和地区分布
+st.subheader("📊 情感与地区分布")
+
 col_left, col_right = st.columns(2)
 
 with col_left:
@@ -235,23 +238,6 @@ with col_left:
         st.plotly_chart(fig, use_container_width=True)
 
 with col_right:
-    if 'source_keyword' in df.columns:
-        keyword_counts = df['source_keyword'].value_counts().head(10)
-        fig = px.bar(
-            x=keyword_counts.values,
-            y=keyword_counts.index,
-            orientation='h',
-            title="Top 10 关键词",
-            labels={'x': '数量', 'y': '关键词'},
-            color=keyword_counts.values,
-            color_continuous_scale='Blues'
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-# 第二行
-col_left2, col_right2 = st.columns(2)
-
-with col_left2:
     if 'ip_location' in df.columns:
         ip_counts = df['ip_location'].value_counts().head(10)
         fig = px.bar(
@@ -260,17 +246,6 @@ with col_left2:
             orientation='h',
             title="地区分布 Top 10",
             labels={'x': '数量', 'y': '地区'}
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-with col_right2:
-    if 'liked_count' in df.columns:
-        fig = px.histogram(
-            df[df['liked_count'] <= 100],
-            x='liked_count',
-            nbins=20,
-            title="点赞数分布（0-100）",
-            labels={'liked_count': '点赞数', 'count': '笔记数'}
         )
         st.plotly_chart(fig, use_container_width=True)
 
