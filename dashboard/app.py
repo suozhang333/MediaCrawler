@@ -286,10 +286,18 @@ with col_export1:
 with col_export2:
     try:
         import io
+        
+        # 复制数据并转换类型，避免 datetime 等问题
+        df_export = df.copy()
+        
+        # 转换所有列为字符串，避免 Excel 写入问题
+        for col in df_export.columns:
+            df_export[col] = df_export[col].astype(str)
+        
         output = io.BytesIO()
         
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name='舆情数据')
+            df_export.to_excel(writer, index=False, sheet_name='舆情数据')
         
         excel_data = output.getvalue()
         
@@ -300,8 +308,8 @@ with col_export2:
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             use_container_width=True
         )
-    except ImportError:
-        st.info("安装 openpyxl 后支持 Excel 导出")
+    except Exception as e:
+        st.error(f"Excel 导出失败: {str(e)[:100]}")
 
 st.markdown("---")
 st.caption("🚀 Powered by Streamlit Cloud + Supabase")
