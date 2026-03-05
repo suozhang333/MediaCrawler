@@ -6,6 +6,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import requests
 from datetime import datetime, timedelta
 
@@ -143,6 +144,61 @@ st.markdown("---")
 # ==================== 可视化 ====================
 
 st.header("📊 数据分析")
+
+# 按日期统计正负面笔记
+if 'publish_time' in df.columns and 'sentiment' in df.columns:
+    st.subheader("📅 每日舆情趋势")
+    
+    # 提取日期（去掉时间）
+    df['date'] = df['publish_time'].dt.date
+    
+    # 按日期和情感分组统计
+    daily_sentiment = df.groupby(['date', 'sentiment']).size().reset_index(name='count')
+    
+    # 透视表：日期为行，情感为列
+    daily_pivot = daily_sentiment.pivot(index='date', columns='sentiment', values='count').fillna(0)
+    
+    # 确保三列都存在
+    for col in ['positive', 'neutral', 'negative']:
+        if col not in daily_pivot.columns:
+            daily_pivot[col] = 0
+    
+    # 创建堆叠柱状图
+    fig = go.Figure()
+    
+    fig.add_trace(go.Bar(
+        name='正面',
+        x=daily_pivot.index,
+        y=daily_pivot['positive'],
+        marker_color='#52c41a'
+    ))
+    
+    fig.add_trace(go.Bar(
+        name='中性',
+        x=daily_pivot.index,
+        y=daily_pivot['neutral'],
+        marker_color='#faad14'
+    ))
+    
+    fig.add_trace(go.Bar(
+        name='负面',
+        x=daily_pivot.index,
+        y=daily_pivot['negative'],
+        marker_color='#f5222d'
+    ))
+    
+    fig.update_layout(
+        barmode='stack',
+        title="每日笔记数量（按情感分类）",
+        xaxis_title="日期",
+        yaxis_title="笔记数量",
+        height=400,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    st.markdown("---")
 
 col_left, col_right = st.columns(2)
 
