@@ -114,32 +114,28 @@ if ip_filter and 'ip_location' in df.columns:
 
 st.title("📈 舆情概览")
 
-# 响应式指标卡 - 手机端优化：2行布局
-# 第一行：总笔记数、负面舆情、正面评价
-col_m1, col_m2, col_m3 = st.columns(3)
+# 指标卡 - 5列布局（Streamlit自动适配屏幕）
+col1, col2, col3, col4, col5 = st.columns(5)
 
-with col_m1:
+with col1:
     st.metric("总笔记数", len(df))
 
-with col_m2:
+with col2:
     if 'sentiment' in df.columns:
         neg = len(df[df['sentiment'] == 'negative'])
         st.metric("负面舆情", neg, delta=f"{neg/len(df)*100:.1f}%" if len(df) > 0 else "0%", delta_color="inverse")
 
-with col_m3:
+with col3:
     if 'sentiment' in df.columns:
         pos = len(df[df['sentiment'] == 'positive'])
         st.metric("正面评价", pos)
 
-# 第二行：总点赞、关键词数
-col_m4, col_m5 = st.columns(2)
-
-with col_m4:
+with col4:
     if 'liked_count' in df.columns:
         total_likes = int(df['liked_count'].sum())
         st.metric("总点赞", f"{total_likes:,}")
 
-with col_m5:
+with col5:
     if 'source_keyword' in df.columns:
         keywords = df['source_keyword'].nunique()
         st.metric("关键词数", keywords)
