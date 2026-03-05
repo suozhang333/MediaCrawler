@@ -141,7 +141,10 @@ async def _run_sentiment_analysis_if_needed() -> None:
         print(f"\n[Main] Starting sentiment analysis: {data_file.name}")
         
         # 执行情感分析
-        processor = SentimentProcessor()
+        use_local = os.getenv("USE_LOCAL_SENTIMENT", "false").lower() == "true"
+        logger.info(f"[Sentiment] use_local={use_local}")
+        print(f"[Sentiment] use_local={use_local}")
+        processor = SentimentProcessor(use_local=use_local)
         result = processor.run(data_file)
         
         # 结果显示在 processor.run() 内部已打印，这里只打印简洁总结
@@ -210,6 +213,12 @@ async def main() -> None:
         await db.init_db(args.init_db)
         print(f"Database {args.init_db} initialized successfully.")
         return
+    
+    # 调试输出配置值
+    logger.info(f"[Config] ENABLE_SCHEDULER={config.ENABLE_SCHEDULER}")
+    logger.info(f"[Config] USE_LOCAL_SENTIMENT={os.getenv('USE_LOCAL_SENTIMENT', 'not set')}")
+    print(f"\n[Config] ENABLE_SCHEDULER={config.ENABLE_SCHEDULER}")
+    print(f"[Config] USE_LOCAL_SENTIMENT={os.getenv('USE_LOCAL_SENTIMENT', 'not set')}")
     
     # 定时任务模式
     if config.ENABLE_SCHEDULER:
