@@ -237,7 +237,13 @@ if 'sentiment' in df.columns:
                 
                 with col2:
                     if row.get('publish_time'):
-                        st.caption(f"发布时间: {row['publish_time'][:10]}")
+                        # 处理 datetime 对象
+                        pub_time = row['publish_time']
+                        if isinstance(pub_time, str):
+                            time_str = pub_time[:10]
+                        else:
+                            time_str = str(pub_time)[:10]
+                        st.caption(f"发布时间: {time_str}")
     else:
         st.success("✅ 暂无负面舆情")
 
