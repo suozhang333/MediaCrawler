@@ -285,12 +285,56 @@ if 'title' in display_df.columns and 'note_url' in display_df.columns:
 st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 # 导出功能
-st.download_button(
-    label="📥 导出数据 (CSV)",
-    data=df.to_csv(index=False).encode('utf-8'),
-    file_name=f"舆情数据_{datetime.now().strftime('%Y%m%d')}.csv",
-    mime='text/csv'
-)
+col_export1, col_export2 = st.columns(2)
+
+with col_export1:
+    # CSV 导出
+    st.download_button(
+        label="📥 导出 CSV",
+        data=df.to_csv(index=False).encode('utf-8-sig'),  # utf-8-sig 支持 Excel 打开中文
+        file_name=f"舆情数据_{datetime.now().strftime('%Y%m%d')}.csv",
+        mime='text/csv',
+        use_container_width=True
+    )
+
+with col_export2:
+    # Excel 导出
+    try:
+        import io
+        output = io.BytesIO()
+        
+        # 创建 Excel writer
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='舆情数据')
+            
+            # 获取 workbook 和 worksheet 进行格式调整
+            workbook = writer.book
+            worksheet = writer.sheets['舆情数据']
+            
+            # 调整列宽
+            for column in worksheet.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)  # 最大50
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+        
+        excel_data = output.getvalue()
+        
+        st.download_button(
+            label="📊 导出 Excel",
+            data=excel_data,
+            file_name=f"舆情数据_{datetime.now().strftime('%Y%m%d')}.xlsx",
+            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            use_container_width=True
+        )
+    except ImportError:
+        st.info("安装 openpyxl 后支持 Excel 导出: `pip install openpyxl`")
 
 # ==================== 页脚 ====================
 
