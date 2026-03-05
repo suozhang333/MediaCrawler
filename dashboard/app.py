@@ -191,7 +191,7 @@ if 'publish_time' in df.columns and 'sentiment' in df.columns:
     fig.update_layout(
         barmode='stack',
         title="每日笔记数量（按情感分类）",
-        xaxis_title="发布日期",
+        xaxis_title="发布日期（月-日）",
         yaxis_title="笔记数量",
         height=350,
         legend=dict(
@@ -202,10 +202,11 @@ if 'publish_time' in df.columns and 'sentiment' in df.columns:
             x=0.5,
             title_text=''
         ),
-        # 手机端优化
+        # 强制X轴为字符串类型，避免Plotly自动解析为日期
         xaxis=dict(
             tickangle=-45,
-            tickfont=dict(size=10)
+            tickfont=dict(size=10),
+            type='category'  # 关键：强制为分类类型
         ),
         margin=dict(l=50, r=50, t=80, b=80)
     )
