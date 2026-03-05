@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 load_dotenv(project_root / ".env")
 
 from libs.baidu_nlp import BaiduNLP
+from libs.local_sentiment import LocalSentimentAnalyzer
 from libs.supabase_client import SupabaseClient
 from libs.wechat_work_webhook import NegativeAlertPusher
 import os
@@ -34,17 +35,29 @@ class SentimentProcessor:
         print(f"分析完成: {result['processed']}/{result['total']}")
     """
     
-    def __init__(self, qps: float = 1.6, enable_alert: bool = True):
+    def __init__(self, qps: float = 1.6, enable_alert: bool = True, use_local: bool = None):
         """
         初始化处理器
         
         Args:
             qps: 每秒请求数，控制百度API调用频率
             enable_alert: 是否启用负面舆情实时推送
+            use_local: 是否使用本地SnowNLP（None=自动检测）
         """
-        self.nlp = BaiduNLP()
+        # 自动选择：公司网络用本地，其他用百度
+        if use_local is None:
+            use_local = os.getenv("USE_LOCAL_SENTIMENT", "false").lower() == "true"
+        
+        if use_local:
+            print("[SentimentProcessor] 使用本地 SnowNLP 情感分析")
+            self.nlp = LocalSentimentAnalyzer()
+            self.delay = 0.1  # 本地分析快，间隔短
+        else:
+            print("[SentimentProcessor] 使用百度 NLP 情感分析")
+            self.nlp = BaiduNLP()
+            self.delay = 1.0 / qps  # 百度API需要控制QPS
+        
         self.supabase = SupabaseClient()
-        self.delay = 1.0 / qps  # 请求间隔
         self.processed = 0
         self.failed = 0
         self.negative_count = 0
